@@ -49,12 +49,14 @@ PKG_NAME=$(basename "$DOWNLOAD_URL")
 [ -z "$LATEST_TAG" ]    && error "无法解析最新版本号"
 [ -z "$DOWNLOAD_URL" ]  && error "未找到适合 $PKG_ARCH 的下载包"
 
-# 检查当前版本（读取二进制内嵌版本）
+# 检查当前版本（读取二进制内嵌版本，去掉 v 前缀后比较）
 CURRENT_VERSION=$("$INSTALL_DIR/zdir" version 2>/dev/null || echo "unknown")
+CURRENT_VERSION_NORM=$(echo "$CURRENT_VERSION" | sed 's/^v//')
+LATEST_TAG_NORM=$(echo "$LATEST_TAG" | sed 's/^v//')
 info "当前版本：$CURRENT_VERSION"
 info "最新版本：$LATEST_TAG"
 
-if [ "$CURRENT_VERSION" = "$LATEST_TAG" ]; then
+if [ "$CURRENT_VERSION_NORM" = "$LATEST_TAG_NORM" ]; then
     warn "当前已是最新版本 ($LATEST_TAG)，无需更新"
     read -p "仍要强制更新？[y/N] " force
     [[ "$force" =~ ^[Yy]$ ]] || { info "已取消"; exit 0; }
