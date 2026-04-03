@@ -84,8 +84,6 @@ func RenameFile(c *gin.Context) {
 	//验证全部通过，进行文件重命名
 
 	err := os.Rename(old_path, new_path)
-	// fmt.Println(old_path)
-	// fmt.Println(new_path)
 
 	if err != nil {
 		c.JSON(200, gin.H{
@@ -97,6 +95,8 @@ func RenameFile(c *gin.Context) {
 		c.Abort()
 		return
 	} else {
+		// 重命名成功后清除所在目录的列表缓存
+		DelCache("dirlist:" + public_dir + fpath)
 		c.JSON(200, gin.H{
 			"code": 200,
 			"msg":  "success",

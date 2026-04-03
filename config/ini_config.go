@@ -41,6 +41,14 @@ func Public_path() string {
 	return dir
 }
 
+// 返回目录列表缓存时长（秒）
+// 0 表示不缓存，适合本地高速磁盘
+// 建议网络挂载盘（rclone/sshfs）设置 30~300 秒
+func DirCacheTTL() int {
+	ttl := viper.GetInt("storages.dir_cache_ttl")
+	return ttl
+}
+
 // 返回公共存储的域名
 func Public_domain(c *gin.Context) string {
 	//获取请求host

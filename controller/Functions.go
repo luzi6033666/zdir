@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"math/rand"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -73,4 +74,13 @@ func UrlEncode(content string) string {
 	new_url = strings.Replace(new_url, " ", "%20", -1)
 
 	return new_url
+}
+
+// 获取路径的父目录路径（用于缓存清除）
+func getParentPath(fpath string) string {
+	parent := filepath.Dir(fpath)
+	if parent == "." {
+		return ""
+	}
+	return parent
 }

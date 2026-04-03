@@ -64,6 +64,9 @@ func Delete_File(c *gin.Context) {
 		c.Abort()
 		return
 	} else {
+		// 删除成功后清除父目录的列表缓存
+		parentDir := public_dir + getParentPath(fpath)
+		DelCache("dirlist:" + parentDir)
 		c.JSON(200, gin.H{
 			"code": 200,
 			"msg":  "success",

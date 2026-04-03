@@ -2,6 +2,7 @@ package controller
 
 import (
 	"os"
+	"strings"
 	"zdir/config"
 
 	"github.com/gin-gonic/gin"
@@ -76,6 +77,10 @@ func Upload(c *gin.Context) {
 	dst := full_path + file_name
 	// 上传文件至指定的完整文件路径
 	c.SaveUploadedFile(file, dst)
+
+	// 上传成功后清除该目录的列表缓存，确保文件立即可见
+	// 需要去掉末尾的 / 以匹配 FileList 中的缓存 key 格式
+	DelCache("dirlist:" + strings.TrimRight(full_path, "/"))
 
 	//拼接url
 	var finfo fileinfo

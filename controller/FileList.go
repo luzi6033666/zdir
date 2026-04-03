@@ -1,8 +1,7 @@
 package controller
 
 import (
-	"fmt"
-	"io/ioutil"
+	"encoding/json"
 	"log"
 	"net/url"
 	"os"
@@ -24,6 +23,15 @@ type info struct {
 	Link  string
 }
 
+// 预编译隐藏文件正则，避免每次请求重新编译
+var hiddenFileRe = regexp.MustCompile(`^(\.|@|#).*`)
+
+// GetDirCacheTTL 返回目录列表缓存时间（秒），0表示不缓存
+// 网络挂载盘建议设置较大的值（如60秒），本地磁盘可设为0
+func GetDirCacheTTL() int {
+	return config.DirCacheTTL()
+}
+
 // 获取文件列表
 func FileList(c *gin.Context) {
 	//获取公共存储的路径
@@ -32,9 +40,7 @@ func FileList(c *gin.Context) {
 	//获取请求参数
 	path := c.Query("path")
 	//判断用户传递的路径是否合法
-	v_re := !V_fpath(path)
-	fmt.Println(v_re)
-	if v_re {
+	if !V_fpath(path) {
 		c.JSON(200, gin.H{
 			"code": -1000,
 			"msg":  "文件夹不合法！",
@@ -43,6 +49,7 @@ func FileList(c *gin.Context) {
 		c.Abort()
 		return
 	}
+
 	//组合完整路径
 	var full_path string
 	if path == "" {
@@ -50,6 +57,7 @@ func FileList(c *gin.Context) {
 	} else {
 		full_path = public_dir + "/" + path
 	}
+
 	//判断文件是否存在，如果不存在，则终止执行
 	_, err := os.Stat(full_path)
 	if os.IsNotExist(err) {
@@ -62,79 +70,93 @@ func FileList(c *gin.Context) {
 		return
 	}
 
-	//声明文件类型
-	var ftype string
-	//声明一个结构体类型
-	var new_info info
-	//声明一个空的切片
-	result := []info{}
-	files, err := ioutil.ReadDir(full_path)
+	// 检查目录列表缓存
+	cacheTTL := GetDirCacheTTL()
+	cacheKey := []byte("dirlist:" + full_path)
+	if cacheTTL > 0 {
+		if cached := GetCache(cacheKey); len(cached) > 0 {
+			c.Header("Content-Type", "application/json; charset=utf-8")
+			c.Header("X-Cache", "HIT")
+			c.String(200, string(cached))
+			return
+		}
+	}
+
+	// 使用 os.ReadDir 替代 ioutil.ReadDir：
+	// 1. ioutil.ReadDir 已废弃
+	// 2. os.ReadDir 返回 DirEntry，获取基础信息无需额外 stat 调用
+	entries, err := os.ReadDir(full_path)
 	if err != nil {
 		log.Print(err)
+		c.JSON(200, gin.H{
+			"code": 500,
+			"msg":  "读取目录失败！",
+			"data": "",
+		})
+		return
 	}
 
-	for _, file := range files {
-		//获取文件或文件夹路径
-		fpath := full_path + "/" + file.Name()
-		fname := file.Name()
-		finfo, err := os.Stat(fpath)
+	sort_result := []info{}
+	sort_result_file := []info{}
+
+	for _, entry := range entries {
+		fname := entry.Name()
+
+		// 隐藏文件过滤（使用预编译正则）
+		if hiddenFileRe.MatchString(fname) {
+			continue
+		}
+
+		var new_info info
+		var ftype string
+
+		if entry.IsDir() {
+			ftype = "folder"
+			new_info.Ext = ""
+			new_info.Link = ""
+		} else {
+			ftype = "file"
+			ext_temp := strings.Split(fname, ".")
+			new_info.Ext = strings.ToLower(ext_temp[len(ext_temp)-1])
+		}
+
+		// 获取文件元信息：只有在需要 Size/Mtime 时才调用 Info()
+		// 对于网络挂载盘，DirEntry.Info() 通常可直接从目录条目获取，避免额外 stat
+		fi, err := entry.Info()
 		if err != nil {
 			log.Print(err)
-			return
+			continue
+		}
+
+		new_info.Ftype = ftype
+		new_info.Mtime = fi.ModTime().Format("2006-01-02 15:04:05")
+		new_info.Size = fi.Size()
+		new_info.Name = fname
+		new_info.Fpath = path + "/" + fname
+		new_info.Link = storage_domain + url.QueryEscape(new_info.Fpath)
+
+		if ftype == "folder" {
+			sort_result = append(sort_result, new_info)
 		} else {
-			//如果是隐藏文件，直接跳过(. @ #开头的视为隐藏文件)
-			var validHide = regexp.MustCompile(`^(\.|@|#).*`)
-			v_re := validHide.MatchString(fname)
-			if v_re {
-				continue
-			}
-
-			//如果是目录
-			if finfo.IsDir() {
-				//文件类型赋值为folder
-				ftype = "folder"
-				new_info.Ext = ""
-				new_info.Link = ""
-			} else {
-				ftype = "file"
-				//获取扩展名
-				ext_temp := strings.Split(fname, ".")
-				//取分隔的最后一个元素
-				new_info.Ext = strings.ToLower(ext_temp[len(ext_temp)-1])
-			}
-			//继续获取其它信息
-			new_info.Ftype = ftype
-			new_info.Mtime = finfo.ModTime().Format("2006-01-02 15:04:05")
-			new_info.Size = finfo.Size()
-			new_info.Name = fname
-			new_info.Fpath = path + "/" + fname
-			new_info.Link = storage_domain + url.QueryEscape(new_info.Fpath)
-
-			//追加到数据信息
-			result = append(result, new_info)
-		}
-
-	}
-	//对数据进行排序并返回，文件夹排前，文件靠后
-	//sort_result_dir := []info{}
-	sort_result_file := []info{}
-	sort_result := []info{}
-	for _, value := range result {
-		if value.Ftype == "folder" {
-			sort_result = append(sort_result, value)
-		} else if value.Ftype == "file" {
-			sort_result_file = append(sort_result_file, value)
+			sort_result_file = append(sort_result_file, new_info)
 		}
 	}
 
-	for _, value := range sort_result_file {
-		sort_result = append(sort_result, value)
-	}
+	// 文件夹在前，文件在后
+	sort_result = append(sort_result, sort_result_file...)
 
-	//返回json数据
-	c.JSON(200, gin.H{
+	resp := gin.H{
 		"code": 200,
 		"msg":  "success",
 		"data": sort_result,
-	})
+	}
+
+	// 如果开启了目录缓存，将结果序列化后存入缓存
+	if cacheTTL > 0 {
+		if jsonBytes, err := json.Marshal(resp); err == nil {
+			SetCache(cacheKey, jsonBytes, cacheTTL)
+		}
+	}
+
+	c.JSON(200, resp)
 }

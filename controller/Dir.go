@@ -72,6 +72,8 @@ func Mkdir(c *gin.Context) {
 		c.Abort()
 		return
 	} else {
+		// 创建成功后清除父目录的列表缓存
+		DelCache("dirlist:" + full_path)
 		c.JSON(200, gin.H{
 			"code": 200,
 			"msg":  "success",

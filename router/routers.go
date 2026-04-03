@@ -126,6 +126,8 @@ func Start() {
 	r.GET("/api/update_sql", check_auth(), controller.UpdateSQL)
 	//修改密码
 	r.POST("/api/user/change_password", check_auth(), controller.ChangePassword)
+	//清除目录列表缓存（管理员操作，适用于网络挂载盘手动刷新）
+	r.POST("/api/cache/clear", check_auth(), controller.ClearDirCache)
 
 	//r.GET("/api/test", controller.Test123)
 	//r.GET("/result", controller.OptionGet)
