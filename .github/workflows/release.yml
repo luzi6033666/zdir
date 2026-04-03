@@ -1,0 +1,100 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Get version from cli/Version.go
+        id: version
+        run: |
+          VERSION=$(grep 'Version = ' cli/Version.go | sed 's/.*"\(.*\)".*/\1/')
+          DATE=$(grep 'VersionDate = ' cli/Version.go | sed 's/.*"\(.*\)".*/\1/')
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "date=${DATE}" >> $GITHUB_OUTPUT
+          echo "tag=v${VERSION}-${DATE}" >> $GITHUB_OUTPUT
+
+      - name: Build linux/amd64
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o zdir .
+
+      - name: Package linux/amd64
+        run: |
+          tar -zcf zdir_${{ steps.version.outputs.version }}_linux_amd64.tar.gz \
+            zdir \
+            config.simple.ini \
+            templates/ \
+            sql/ \
+            sh/
+
+      - name: Build linux/arm64
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-w -s" -o zdir .
+
+      - name: Package linux/arm64
+        run: |
+          tar -zcf zdir_${{ steps.version.outputs.version }}_linux_arm64.tar.gz \
+            zdir \
+            config.simple.ini \
+            templates/ \
+            sql/ \
+            sh/
+
+      - name: Delete existing release if exists
+        run: |
+          gh release delete ${{ steps.version.outputs.tag }} --yes 2>/dev/null || true
+          git push origin :refs/tags/${{ steps.version.outputs.tag }} 2>/dev/null || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "Zdir ${{ steps.version.outputs.version }} (${{ steps.version.outputs.date }})"
+          body: |
+            ## 下载说明
+
+            | 文件 | 适用平台 |
+            |------|---------|
+            | `zdir_*_linux_amd64.tar.gz` | Linux x86_64（大多数 VPS）|
+            | `zdir_*_linux_arm64.tar.gz` | Linux ARM64（如树莓派、部分 NAS）|
+
+            ## 安装方式
+
+            ```bash
+            # 下载（以 amd64 为例）
+            wget https://github.com/luzi6033666/zdir/releases/latest/download/zdir_${{ steps.version.outputs.version }}_linux_amd64.tar.gz
+
+            # 解压
+            tar -zxf zdir_${{ steps.version.outputs.version }}_linux_amd64.tar.gz -C /opt/zdir/
+
+            # 首次部署
+            cd /opt/zdir && ./zdir init && ./zdir start
+
+            # 更新已有部署（只替换二进制）
+            systemctl stop zdir
+            cd /opt/zdir && tar -zxf zdir_${{ steps.version.outputs.version }}_linux_amd64.tar.gz zdir
+            systemctl start zdir
+            ```
+
+            ## 本次变更
+            ${{ github.event.head_commit.message }}
+          files: |
+            zdir_${{ steps.version.outputs.version }}_linux_amd64.tar.gz
+            zdir_${{ steps.version.outputs.version }}_linux_arm64.tar.gz
+          token: ${{ secrets.GITHUB_TOKEN }}
