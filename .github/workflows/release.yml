@@ -54,6 +54,24 @@ jobs:
             sql/ \
             sh/
 
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # 获取上一个同名 tag，没有则取全部历史
+          PREV_TAG=$(git tag --sort=-creatordate | grep "^v${{ steps.version.outputs.version }}" | sed -n '2p')
+          if [ -z "$PREV_TAG" ]; then
+            # 没有历史 tag，取全部 commit
+            LOG=$(git log --pretty=format:"- %s (%h)" HEAD)
+          else
+            LOG=$(git log --pretty=format:"- %s (%h)" ${PREV_TAG}..HEAD)
+          fi
+          # 写入多行变量
+          {
+            echo "log<<EOF"
+            echo "$LOG"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
       - name: Delete existing release if exists
         run: |
           gh release delete ${{ steps.version.outputs.tag }} --yes 2>/dev/null || true
@@ -67,6 +85,10 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           name: "Zdir ${{ steps.version.outputs.version }} (${{ steps.version.outputs.date }})"
           body: |
+            ## 更新日志
+
+            ${{ steps.changelog.outputs.log }}
+
             ## 下载说明
 
             | 文件 | 适用平台 |
@@ -74,26 +96,19 @@ jobs:
             | `zdir_*_linux_amd64.tar.gz` | Linux x86_64（大多数 VPS）|
             | `zdir_*_linux_arm64.tar.gz` | Linux ARM64（如树莓派、部分 NAS）|
 
-            ## 安装方式
+            ## 安装 / 更新
 
+            **首次部署：**
             ```bash
-            # 下载（以 amd64 为例）
             wget https://github.com/luzi6033666/zdir/releases/latest/download/zdir_${{ steps.version.outputs.version }}_linux_amd64.tar.gz
-
-            # 解压
-            tar -zxf zdir_${{ steps.version.outputs.version }}_linux_amd64.tar.gz -C /opt/zdir/
-
-            # 首次部署
-            cd /opt/zdir && ./zdir init && ./zdir start
-
-            # 更新已有部署（只替换二进制）
-            systemctl stop zdir
-            cd /opt/zdir && tar -zxf zdir_${{ steps.version.outputs.version }}_linux_amd64.tar.gz zdir
-            systemctl start zdir
+            mkdir -p /opt/zdir && tar -zxf zdir_${{ steps.version.outputs.version }}_linux_amd64.tar.gz -C /opt/zdir/
+            cd /opt/zdir && ./zdir init && systemctl start zdir
             ```
 
-            ## 本次变更
-            ${{ github.event.head_commit.message }}
+            **已有部署一键更新（保留配置和数据）：**
+            ```bash
+            bash <(curl -fsSL https://raw.githubusercontent.com/luzi6033666/zdir/main/sh/update.sh)
+            ```
           files: |
             zdir_${{ steps.version.outputs.version }}_linux_amd64.tar.gz
             zdir_${{ steps.version.outputs.version }}_linux_arm64.tar.gz
