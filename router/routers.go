@@ -72,11 +72,14 @@ func Start() {
 	RunMode := config.RunMode()
 	gin.SetMode(RunMode)
 
-	//日志记录到文件
-	f, _ := os.Create("logs/zdir.log")
-	gin.DefaultWriter = io.MultiWriter(f)
-	//日志同时输出到控制台
-	gin.DefaultWriter = io.MultiWriter(f, os.Stdout)
+	//日志记录到文件（同时输出到控制台）
+	f, err := os.OpenFile("logs/zdir.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		// 若日志文件打开失败，仅输出到控制台
+		gin.DefaultWriter = io.MultiWriter(os.Stdout)
+	} else {
+		gin.DefaultWriter = io.MultiWriter(f, os.Stdout)
+	}
 
 	//运行gin
 	r := gin.Default()

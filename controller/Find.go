@@ -95,10 +95,13 @@ func Find(c *gin.Context) {
 			new_info.Fpath = value
 			//storage_domain := config.Public_domain()
 			//new_info.Link = storage_domain + UrlEncode(new_info.Fpath)
-			//获取扩展名
-			ext_temp := strings.Split(value, ".")
-			//取分隔的最后一个元素
-			new_info.Ext = strings.ToLower(ext_temp[len(ext_temp)-1])
+			//获取扩展名（安全方式，避免无扩展名时返回整个文件名）
+			fname := new_info.Name
+			if idx := strings.LastIndexByte(fname, '.'); idx > 0 && idx < len(fname)-1 {
+				new_info.Ext = strings.ToLower(fname[idx+1:])
+			} else {
+				new_info.Ext = ""
+			}
 
 			//追加到数据信息
 			data = append(data, new_info)

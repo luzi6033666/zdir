@@ -116,8 +116,12 @@ func FileList(c *gin.Context) {
 			new_info.Link = ""
 		} else {
 			ftype = "file"
-			ext_temp := strings.Split(fname, ".")
-			new_info.Ext = strings.ToLower(ext_temp[len(ext_temp)-1])
+			// 安全地获取文件扩展名，避免空文件名或没有后缀的情况
+			if idx := strings.LastIndexByte(fname, '.'); idx > 0 && idx < len(fname)-1 {
+				new_info.Ext = strings.ToLower(fname[idx+1:])
+			} else {
+				new_info.Ext = ""
+			}
 		}
 
 		// 获取文件元信息：只有在需要 Size/Mtime 时才调用 Info()

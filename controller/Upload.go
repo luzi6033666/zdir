@@ -40,8 +40,7 @@ func Upload(c *gin.Context) {
 	}
 
 	//判断上传路径是否带有/
-	end_path_str := string(path[len(path)-1])
-	if end_path_str != "/" {
+	if len(path) == 0 || path[len(path)-1] != '/' {
 		path = path + "/"
 	}
 
@@ -62,7 +61,15 @@ func Upload(c *gin.Context) {
 	}
 
 	// 单文件
-	file, _ := c.FormFile("file")
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(200, gin.H{
+			"code": -1000,
+			"msg":  "文件上传失败！",
+			"data": "",
+		})
+		return
+	}
 	file_name := file.Filename
 	//验证文件名是否合法
 	if !V_fname(file_name) {

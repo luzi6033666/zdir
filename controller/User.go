@@ -181,8 +181,8 @@ func UserLogin(c *gin.Context) {
 	get_username := c.PostForm("username")
 	get_password := c.PostForm("password")
 	//去除空白字符串
-	username = strings.Replace(username, " ", "", -1)
-	password = strings.Replace(password, " ", "", -1)
+	get_username = strings.Replace(get_username, " ", "", -1)
+	get_password = strings.Replace(get_password, " ", "", -1)
 
 	//如果用户输入的密码是空的，则不允许登录
 	if get_password == "" {
@@ -194,10 +194,10 @@ func UserLogin(c *gin.Context) {
 		return
 	}
 
+	//用户名转小写
+	get_username = strings.ToLower(get_username)
 	//密码进行md5加密
 	get_password = md5s(get_username + get_password)
-	//用户名转小写
-	get_username = strings.ToLower(username)
 
 	//比较用户名、密码是否匹配
 	if username == get_username && password == get_password {

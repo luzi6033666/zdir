@@ -99,7 +99,7 @@ func V_is_path(fpath string) bool {
 
 // 验证用户名是否合法
 func V_username(username string) bool {
-	var validUser = regexp.MustCompile(`^[a-z0-9]{2,16}`)
+	var validUser = regexp.MustCompile(`^[a-z0-9]{2,16}$`)
 	v_re := validUser.MatchString(username)
 
 	if !v_re {
@@ -111,7 +111,7 @@ func V_username(username string) bool {
 
 // 判断用户密码是否符合规范
 func V_password(password string) bool {
-	var validPass = regexp.MustCompile(`^[a-zA-Z0-9!@#$%^&\*\(\)_\.]{8,16}`)
+	var validPass = regexp.MustCompile(`^[a-zA-Z0-9!@#$%^&\*\(\)_\.]{8,16}$`)
 	v_re := validPass.MatchString(password)
 
 	if !v_re {

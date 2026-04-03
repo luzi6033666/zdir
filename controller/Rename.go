@@ -20,8 +20,7 @@ func RenameFile(c *gin.Context) {
 	fpath := c.PostForm("fpath")
 
 	//判断路径是否带有/
-	end_path_str := string(fpath[len(fpath)-1])
-	if end_path_str != "/" {
+	if len(fpath) == 0 || fpath[len(fpath)-1] != '/' {
 		fpath = fpath + "/"
 	}
 

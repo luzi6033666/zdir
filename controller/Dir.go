@@ -17,8 +17,7 @@ func Mkdir(c *gin.Context) {
 	path := c.PostForm("path")
 
 	//判断路径是否带有/
-	end_path_str := string(path[len(path)-1])
-	if end_path_str != "/" {
+	if len(path) == 0 || path[len(path)-1] != '/' {
 		path = path + "/"
 	}
 
